@@ -2,12 +2,53 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 import { reactRouter } from '@react-router/dev/vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import tailwindcss from 'tailwindcss';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import dedent from 'dedent';
+
+const isDockerBuild = process.env.DOCKER_BUILD === 'true';
+
+// entry.server.tsx renders with `renderToReadableStream` (the workerd entry);
+// under Node, `react-dom/server` resolves to the pipeable-stream variant, so
+// pin the edge build (web streams, fully supported by Node) for Docker builds.
+const reactDomServerEdge = createRequire(import.meta.url).resolve('react-dom/server', {
+  conditions: new Set(['workerd']),
+});
+
+// workers-og only works on Workers (wasm integrations); degrade OG image
+// routes to a 1x1 transparent PNG when building for Docker/Node.
+const dockerResolveAliases = isDockerBuild
+  ? {
+      'react-dom/server': reactDomServerEdge,
+      'workers-og': fileURLToPath(new URL('../../docker/app/workers-og-stub.mjs', import.meta.url)),
+    }
+  : {};
+
+const cloudflareWorkersShim = (): Plugin => ({
+  name: 'docker-cloudflare-workers-shim',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id === 'cloudflare:workers') {
+      return '\0virtual:cloudflare-workers-shim';
+    }
+  },
+  load(id) {
+    if (id === '\0virtual:cloudflare-workers-shim') {
+      return 'export const env = process.env;';
+    }
+  },
+});
+
+// Docker/Node runs the SSR bundle directly, so the whole dependency graph
+// is inlined: some deps ship bundler-only dists (extension-less ESM imports
+// Node cannot resolve) and CJS interop breaks named exports like
+// `renderToReadableStream` from `react-dom/server`.
+const dockerSsrConfig = isDockerBuild ? { noExternal: true } : undefined;
 
 export default defineConfig({
   plugins: [
-    cloudflare({ viteEnvironment: { name: 'ssr' } }),
+    ...(isDockerBuild ? [cloudflareWorkersShim()] : [cloudflare({ viteEnvironment: { name: 'ssr' } })]),
     reactRouter(),
     tsconfigPaths(),
     {
@@ -42,9 +83,11 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
+  ssr: dockerSsrConfig,
   resolve: {
     alias: {
       tslib: 'tslib/tslib.es6.js',
+      ...dockerResolveAliases,
     },
   },
 });

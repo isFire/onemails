@@ -43,6 +43,7 @@
     "@react-email/html": "^0.0.11",
     "@react-email/render": "^1.1.2",
     "@react-router/dev": "^7.6.0",
+    "@react-router/serve": "^7.6.0",
     "@sentry/react": "9.19.0",
     "@tanstack/query-sync-storage-persister": "^5.75.0",
     "@tanstack/react-query": "^5.74.4",

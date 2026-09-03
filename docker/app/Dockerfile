@@ -1,49 +1,48 @@
+# NOTE: the upstream bun.lock only covers the root + packages/* workspaces;
+# the complete dependency graph (apps/* + the "novel" patch) lives in
+# pnpm-lock.yaml, so this image installs with pnpm, not bun.
+
 # ========================================
-# Base Stage: Alpine Linux with Bun
+# Base Stage: Alpine Linux with Node
 # ========================================
-FROM oven/bun:alpine AS base
+FROM node:22-alpine AS base
 
 # ========================================
 # Dependencies Stage: Install Dependencies
 # ========================================
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN corepack enable
 WORKDIR /app
 
-# Install turbo globally
-RUN bun install -g turbo
-
-COPY package.json bun.lock turbo.json ./
-RUN mkdir -p apps packages
-COPY apps/*/package.json ./apps/
-COPY packages/*/package.json ./packages/
-COPY packages/tsconfig/ ./packages/tsconfig/
-
-RUN bun install --omit dev --ignore-scripts
+# Workspace manifests only (no sources) for maximal layer caching
+COPY --parents package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc patches/ apps/*/package.json packages/*/package.json scripts/package.json ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ========================================
 # Builder Stage: Build the Application
 # ========================================
 FROM base AS builder
+RUN corepack enable
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+# Bring the installed dependency tree (root + per-workspace node_modules)
+COPY --from=deps /app ./
+# Then the actual sources (context has no node_modules, see .dockerignore)
 COPY . .
+RUN rm -rf apps/mail/build apps/mail/.react-router
 
-# Installing with full context to prevent missing dependencies error
-RUN bun install --omit dev --ignore-scripts
-
-# Required for standalone nextjs build
-WORKDIR /app/apps/mail
-RUN bun install sharp
-
-# Set environment variables for build
-ENV NEXT_TELEMETRY_DISABLED=1 \
+# The SSR bundle is built self-contained for Node; the VITE_* URLs are
+# baked as placeholders and rewritten at container start (entrypoint.sh).
+ENV DOCKER_BUILD=true \
     NODE_ENV=production \
-    DOCKER_BUILD=true
+    VITE_PUBLIC_BACKEND_URL=http://REPLACE-BACKEND-URL.com \
+    VITE_PUBLIC_APP_URL=http://REPLACE-APP-URL.com
+RUN pnpm --filter @zero/mail run build
 
-WORKDIR /app
-RUN cd apps/mail && bun run build
+# @react-router/serve pinned to the exact version resolved in the lockfile
+# (matches the react-router version compiled into the SSR bundle)
+RUN mkdir -p /serve && cd /serve \
+    && npm install --omit=dev --ignore-scripts --no-audit --no-fund @react-router/serve@7.6.0
 
 # ========================================
 # Runner Stage: Production Environment
@@ -51,31 +50,24 @@ RUN cd apps/mail && bun run build
 FROM base AS runner
 WORKDIR /app
 
-RUN addgroup -S -g 1001 bunjs && \
-    adduser -S -u 1001 nextjs -G bunjs
+RUN addgroup -S -g 1001 nodejs && \
+    adduser -S -u 1001 -G nodejs nextjs
 
-# Set environment variables for build
 ENV NODE_ENV=production \
-    PORT=3000 \
-    HOSTNAME="0.0.0.0" \
-    NEXT_TELEMETRY_DISABLED=1
+    PORT=3000
 
-# Copy entrypoint and run it
-COPY scripts/docker/ /app/scripts
-RUN chmod -R +x /app/scripts/*
+# Copy entrypoint and placeholder replacement scripts
+COPY scripts/docker/ /app/scripts/
+RUN chmod +x /app/scripts/*.sh
 
-# Copy public assets
-COPY --from=builder --chown=nextjs:bunjs /app/apps/mail/public ./apps/mail/public
+# SSR bundle (build/server) + client assets (build/client)
+COPY --from=builder --chown=nextjs:nodejs /app/apps/mail/build ./apps/mail/build
 
-# Leverage output traces to reduce image size (standalone output)
-COPY --from=builder --chown=nextjs:bunjs /app/apps/mail/.next/standalone ./
-COPY --from=builder --chown=nextjs:bunjs /app/apps/mail/.next/static ./apps/mail/.next/static
+# react-router-serve runtime (express and its small dependency closure)
+COPY --from=builder --chown=nextjs:nodejs /serve/node_modules ./serve/node_modules
 
-# Switch to non-root user
 USER nextjs
 
-# Set server port and host
 EXPOSE 3000
 
-# Start the server
 CMD ["/app/scripts/entrypoint.sh"]

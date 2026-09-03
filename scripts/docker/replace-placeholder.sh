@@ -31,6 +31,6 @@ fi
 # Only peform action if $FROM and $TO are different.
 echo "Replacing all statically built instances of $FROM with $TO."
 
-for file in $(egrep -r -l "${FROM}" /app/apps/mail); do
-    sed -i -e "s|$FROM|$TO|g" "$file"
+for file in $(grep -r -l -F -- "${FROM}" /app/apps/mail/build 2>/dev/null); do
+    sed -i -e "s|${FROM}|${TO}|g" "$file"
 done

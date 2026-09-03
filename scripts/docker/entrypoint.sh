@@ -1,10 +1,11 @@
 #!/bin/sh
-set -x
+set -e
 
-# Replacing placeholder urls to runtime variables, since we're using rewrites in nextjs, this is required.
-# Everything else which doesn't compile URLs at build should already be able to use runtime variables.
+# Rewriting statically built URLs at container start: VITE_* variables are
+# inlined into the bundle by Vite at build time, so runtime environment
+# variables alone cannot change them.
 
-/app/scripts/replace-placeholder.sh "http://REPLACE-BACKEND-URL.com" "$NEXT_PUBLIC_BACKEND_URL"
-/app/scripts/replace-placeholder.sh "http://REPLACE-APP-URL.com" "$NEXT_PUBLIC_APP_URL"
+/app/scripts/replace-placeholder.sh "http://REPLACE-BACKEND-URL.com" "$VITE_PUBLIC_BACKEND_URL"
+/app/scripts/replace-placeholder.sh "http://REPLACE-APP-URL.com" "$VITE_PUBLIC_APP_URL"
 
-exec bun /app/apps/mail/server.js
+exec node /app/serve/node_modules/@react-router/serve/bin.js /app/apps/mail/build/server/index.js
