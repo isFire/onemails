@@ -1,0 +1,104 @@
+# Multi-arch image publishing to GHCR.
+#
+# Push rules:
+#   - main push        -> latest + sha-<short>
+#   - tag v*           -> semver family (1.2.3 / 1.2 / 1) + latest
+#   - workflow_dispatch-> branch-<name>
+#   - pull_request     -> build verification ONLY (never pushes)
+#
+# The "server" target is an experimental spike image (see docker/server/SPIKE.md):
+# its failure does not fail the run, while app and migrations remain blocking.
+
+name: docker-publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    # Experimental targets (server spike) are allowed to fail without blocking
+    # the releasable app/migrations images.
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: app
+            dockerfile: docker/app/Dockerfile
+            experimental: false
+          - target: migrations
+            dockerfile: docker/db/Dockerfile
+            experimental: false
+          - target: server
+            dockerfile: docker/server/Dockerfile
+            experimental: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR image paths must be lowercase; the repository owner (isFire) is not.
+      - name: Compute lowercase image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "name=ghcr.io/${OWNER,,}/onemails-${{ matrix.target }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/main') }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/main') }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch,prefix=branch-,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=ref,event=pr,prefix=pr-
+
+      # PR builds stay amd64-only for faster feedback; release builds are
+      # multi-arch. arm64 runs under QEMU emulation (pure-JS workloads only,
+      # no native compilation) so it is slower but reliable.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          # Hard push guard: PR events never push anything to GHCR.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

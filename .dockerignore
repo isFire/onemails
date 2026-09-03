@@ -51,3 +51,7 @@ apps/mail/scripts.ts
 .github
 .devcontainer
 .env.example
+
+# local react-router build artifacts (keep build context slim)
+apps/mail/build
+apps/mail/.react-router
