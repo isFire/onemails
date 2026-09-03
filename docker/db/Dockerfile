@@ -10,9 +10,8 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/tsconfig/base.json ./packages/tsconfig/base.json
 COPY packages/tsconfig/package.json ./packages/tsconfig/
 
-# Install minimal dependencies in one layer
-RUN bun install --omit dev --ignore-scripts && \
-    bun install --omit dev --ignore-scripts drizzle-kit drizzle-orm postgres
+# Install dependencies per bun.lock in one layer (drizzle-kit is a devDependency, so no --omit dev)
+RUN bun install --ignore-scripts
 
 # ========================================
 # Runner Stage: Production Environment
