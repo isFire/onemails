@@ -24,10 +24,10 @@ COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/tailwind-config/package.json packages/tailwind-config/
 COPY packages/tsconfig/package.json packages/tsconfig/
 
-# 锁文件与 package.json 在仓库中已失同步（apps/mail 增依赖未更新锁文件），
-# 因此无法 --frozen-lockfile；--ignore-scripts 跳过 root postinstall(nizzy sync) 与 husky。
+# lockfile 已与 package.json 同步（含 sharp/@react-router/serve）；
+# --ignore-scripts 跳过 root postinstall(nizzy sync) 与 husky。
 # 仅安装 @zero/server 及其 workspace 依赖，避免拉取 apps/mail 的重型依赖。
-RUN HUSKY=0 pnpm install --no-frozen-lockfile --ignore-scripts --filter @zero/server...
+RUN HUSKY=0 pnpm install --frozen-lockfile --ignore-scripts --filter @zero/server...
 
 # --- 源码层 ---
 COPY apps/server/wrangler.jsonc apps/server/tsconfig.json apps/server/

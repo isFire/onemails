@@ -32,8 +32,8 @@ services:
       context: ../..
       dockerfile: docker/server/Dockerfile
       args:
-        # Docker Hub 不可达时可覆盖：NODE_IMAGE=docker.m.daocloud.io/library/node:22-alpine
-        NODE_IMAGE: ${NODE_IMAGE:-docker.io/library/node:22-alpine}
+        # Docker Hub 不可达时可覆盖：NODE_IMAGE=docker.m.daocloud.io/library/node:22-slim
+        NODE_IMAGE: ${NODE_IMAGE:-docker.io/library/node:22-slim}
     environment:
       # 覆盖 wrangler.jsonc 里 Hyperdrive 的 localConnectionString（容器内 PG 不在 localhost）。
       # 机制实证：wrangler 4.16.0 cli.js —— localConnectionString 可被

@@ -90,6 +90,8 @@ $ docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:22-slim 
 
 （Docker Hub 直连在本网络不可达 `EOF`，故构建参数化了 `NODE_IMAGE`/`POSTGRES_IMAGE`，默认值仍为官方源。）
 
+> 注：上方日志中的 `--no-frozen-lockfile` 是 spike 期历史记录；lockfile 失同步已由 50937d1 修复，当前镜像已恢复 `--frozen-lockfile`，见限制清单 #7。
+
 ### 4.2 关键试错记录：alpine/musl 基座不可行（为何选 slim）
 
 第一版用 `node:22-alpine`，server 容器启动即退，原始日志：
@@ -203,7 +205,7 @@ docker compose -f docker/server/docker-compose.spike.yaml down -v   # 清理
 4. **KV/DO 仅本地模拟、非持久**：Miniflare 本地模拟 KV×4 与 DurableMailbox，状态存容器 `/data`（persist-to），容器删除即失；与生产 Cloudflare KV/DO 行为有差异（无真实最终一致性/全球分布语义）。
 5. **service binding `zero → zero-worker` 未连接**：`[not connected]` 非致命；依赖该 binding 的请求路径在容器内不可用（本 spike 未部署 zero-worker）。
 6. **Hyperdrive 是本地模拟**：`[simulated locally]`——binding 直接返回连接串（即 `localConnectionString`/环境变量覆盖值），无生产 Hyperdrive 的连接池/查询加速语义。
-7. **仓库 lockfile 与 package.json 失同步**（预存问题，非本域引入）：`pnpm install --frozen-lockfile` 因 apps/mail 依赖集变化而失败（`sharp` 等未入锁文件），容器内只能 `--no-frozen-lockfile`。建议后续单独修复 lockfile。
+7. **lockfile 失同步（历史问题，已解决）**：spike 期曾因 apps/mail 依赖集变化未更新锁文件（`sharp` 等未入锁文件）导致 `--frozen-lockfile` 失败，镜像被迫降级 `--no-frozen-lockfile`；已由 50937d1 同步 pnpm-lock.yaml，本镜像已恢复 `--frozen-lockfile`。
 8. **`.dev.vars` 为占位密钥**（`docker/server/dev.vars.example`）：仅使 createAuth/lazy 服务可实例化，OAuth/Resend/Upstash 等外部集成本身不可用（属预期）。
 9. **未覆盖的 E2E**：带真实登录态的 tRPC 业务流、DO 广播/WS（partykit）、邮件收发驱动（Gmail/Outlook）均未在容器内验证；email/password 注册在 better-auth 配置中关闭（auth.ts:120 `enabled: false`），unauth 场景无触库 HTTP 端点，DB 链路由 probe（4.5）以驱动级证据补足。
 
