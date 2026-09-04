@@ -28,9 +28,18 @@ if [ "${FROM}" = "${TO}" ]; then
     exit 0
 fi
 
+[ -z "${TO}" ] && echo "ERROR: replacement value for $FROM is empty" >&2 && exit 1
+
 # Only peform action if $FROM and $TO are different.
 echo "Replacing all statically built instances of $FROM with $TO."
 
-for file in $(grep -r -l -F -- "${FROM}" /app/apps/mail/build 2>/dev/null); do
+TO=${TO//\\/\\\\}
+TO=${TO//&/\\&}
+
+files=$(grep -r -l -F -- "${FROM}" /app/apps/mail/build)
+if [ -z "${files}" ]; then
+    echo "WARNING: no files containing ${FROM} found in /app/apps/mail/build." >&2
+fi
+for file in ${files}; do
     sed -i -e "s|${FROM}|${TO}|g" "$file"
 done
