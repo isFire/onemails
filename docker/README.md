@@ -32,6 +32,9 @@ services:
       # 用以下运行时变量原地替换（见 scripts/docker/replace-placeholder.sh）。
       VITE_PUBLIC_BACKEND_URL: https://your-api.example.com
       VITE_PUBLIC_APP_URL: https://your-app.example.com
+      # 与自托管 server 容器同网络时使用：SSR 内部会话代理直连，绕开
+      # Docker DNAT 不回环限制；不设则回退 VITE_PUBLIC_BACKEND_URL。
+      BACKEND_INTERNAL_URL: http://server:8787
       DATABASE_URL: postgresql://postgres:postgres@db:5432/zerodotemail
       REDIS_URL: http://upstash-proxy:80
       REDIS_TOKEN: upstash-local-token

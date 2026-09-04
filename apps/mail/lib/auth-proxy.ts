@@ -3,7 +3,11 @@ import { createAuthClient } from 'better-auth/client';
 import type { Auth } from '@zero/server/auth';
 
 const authClient = createAuthClient({
-  baseURL: import.meta.env.VITE_PUBLIC_BACKEND_URL,
+  // SSR/Node runtime prefers the internal backend URL (container-network
+  // direct connection); the browser has no process.env and falls back to the
+  // build-inlined public URL.
+  baseURL:
+    process.env.BACKEND_INTERNAL_URL || import.meta.env.VITE_PUBLIC_BACKEND_URL,
   fetchOptions: {
     credentials: 'include',
   },
