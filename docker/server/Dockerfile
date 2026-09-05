@@ -9,6 +9,12 @@
 ARG NODE_IMAGE=docker.io/library/node:22-slim
 FROM ${NODE_IMAGE}
 
+# workerd（BoringSSL）出站 TLS 验证读系统 CA store（/etc/ssl/certs）；
+# slim 基座在部分构建环境会缺 ca-certificates（实测 CI 产物 /etc/ssl/certs 为空，
+# 导致 OAuth token 交换握手失败 invalid_code）——显式安装并刷新，不依赖基座状态。
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # pnpm 版本与根 package.json packageManager 字段保持一致
 RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
 
