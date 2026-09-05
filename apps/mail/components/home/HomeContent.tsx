@@ -44,7 +44,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { use, useCallback, useEffect, useRef, useState } from 'react';
-import { signIn, useSession } from '@/lib/auth-client';
+import { useSession } from '@/lib/auth-client';
 import { useInView, motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,6 @@ import { Separator } from '../ui/separator';
 import { useForm } from 'react-hook-form';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 import Footer from './footer';
 import React from 'react';
 import { z } from 'zod';
@@ -236,16 +235,8 @@ export default function HomeContent() {
                   // User is logged in, redirect to inbox
                   navigate('/mail/inbox');
                 } else {
-                  // User is not logged in, show sign-in dialog
-                  toast.promise(
-                    signIn.social({
-                      provider: 'google',
-                      callbackURL: `${window.location.origin}/mail`,
-                    }),
-                    {
-                      error: 'Login redirect failed',
-                    },
-                  );
+                  // User is not logged in, go to provider picker
+                  navigate('/login');
                 }
               }}
             >
@@ -358,15 +349,7 @@ export default function HomeContent() {
         >
           <Button
             onClick={() => {
-              toast.promise(
-                signIn.social({
-                  provider: 'google',
-                  callbackURL: `${window.location.origin}/mail`,
-                }),
-                {
-                  error: 'Login redirect failed',
-                },
-              );
+              navigate('/login');
             }}
             className="h-8"
           >
