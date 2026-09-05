@@ -84,7 +84,6 @@ export const authProviders = (env: Record<string, string>): ProviderConfig[] => 
     config: {
       clientId: env['GITHUB_CLIENT_ID'],
       clientSecret: env['GITHUB_CLIENT_SECRET'],
-      scope: ['read:user', 'user:email'],
     },
     // 仅作登录身份,不是邮箱源(driver 层无 github);不设 required——
     // 缺 env 时跳过即可,不像 google/microsoft 缺了要启动 throw。
