@@ -230,7 +230,8 @@ const createAuthConfig = () => {
       'http://localhost:3000',
       'https://3000-firebase-zero-1748315478636.cluster-3gc7bglotjgwuxlqpiut7yyqt4.cloudworkstations.dev',
       'http://localhost:4173',
-    ],
+      env.VITE_PUBLIC_APP_URL,
+    ].filter(Boolean),
     session: {
       cookieCache: {
         enabled: true,
