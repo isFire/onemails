@@ -73,6 +73,25 @@ export const authProviders = (env: Record<string, string>): ProviderConfig[] => 
     },
     required: true,
   },
+  {
+    id: 'github',
+    name: 'GitHub',
+    requiredEnvVars: ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'],
+    envVarInfo: [
+      { name: 'GITHUB_CLIENT_ID', source: 'GitHub OAuth App' },
+      { name: 'GITHUB_CLIENT_SECRET', source: 'GitHub OAuth App' },
+    ],
+    config: {
+      clientId: env['GITHUB_CLIENT_ID'],
+      clientSecret: env['GITHUB_CLIENT_SECRET'],
+      scope: ['read:user', 'user:email'],
+    },
+    // 仅作登录身份,不是邮箱源(driver 层无 github);不设 required——
+    // 缺 env 时跳过即可,不像 google/microsoft 缺了要启动 throw。
+    // 注:这里用下标访问是因为 tsconfig 开了 noPropertyAccessFromIndexSignature,
+    // 上面的 google/microsoft 条目是历史遗留(同样报错,不在本模块范围修)。
+    required: false,
+  },
   // {
   //   id: 'icloud',
   //   name: 'Apple',

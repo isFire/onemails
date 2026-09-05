@@ -2,7 +2,7 @@ import { useEffect, type ReactNode, useState, Suspense } from 'react';
 import type { EnvVarInfo } from '@zero/server/auth-providers';
 import ErrorMessage from '@/app/(auth)/login/error-message';
 import { signIn, useSession } from '@/lib/auth-client';
-import { Google, Microsoft } from '@/components/icons/icons';
+import { GitHub, Google, Microsoft } from '@/components/icons/icons';
 import { Button } from '@/components/ui/button';
 import { TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -40,6 +40,9 @@ const getProviderIcon = (providerId: string, className?: string): ReactNode => {
 
     case 'microsoft':
       return <Microsoft className={defaultClass} />;
+
+    case 'github':
+      return <GitHub className={defaultClass} />;
 
     case 'zero':
       return (

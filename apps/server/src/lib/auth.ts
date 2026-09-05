@@ -25,6 +25,13 @@ import { eq } from 'drizzle-orm';
 const connectionHandlerHook = async (account: Account) => {
   const c = getContext<HonoContext>();
 
+  // 仅邮箱源 provider 落成「连接」:google/microsoft 有 driver 且 OAuth 发 refresh token;
+  // 纯登录身份的 provider(如 github——无邮件 API、无 refreshToken)直接跳过,
+  // 否则必在下方 token 校验或 createDriver 处炸掉登录流程。
+  if (account.providerId !== 'google' && account.providerId !== 'microsoft') {
+    return;
+  }
+
   if (!account.accessToken || !account.refreshToken) {
     console.error('Missing Access/Refresh Tokens', { account });
     throw new APIError('EXPECTATION_FAILED', { message: 'Missing Access/Refresh Tokens' });
