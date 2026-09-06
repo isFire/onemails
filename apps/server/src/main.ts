@@ -12,6 +12,9 @@ import { Autumn } from 'autumn-js';
 import { appRouter } from './trpc';
 import { cors } from 'hono/cors';
 import { Hono } from 'hono';
+import { patchFetchWithRetry } from './lib/fetch-retry';
+
+patchFetchWithRetry();
 
 const api = new Hono<HonoContext>()
   .use(contextStorage())

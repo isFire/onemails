@@ -16,11 +16,11 @@
 
 ## 待办（按优先级）
 
-1. **GitHub 登录端到端实测**：ioredis 热更后用户还未再试。路径：强刷 → 首页 Sign in → Continue with GitHub → 授权 → 应登录成功（createSession 现在写本地 redis）
+1. **GitHub 登录端到端实测**：应用侧全部修完（redis/env/代码/CA）。网络侧三重坎：①DNS 把 github.com 解析到死 IP `20.205.243.166` → 容器 `/etc/hosts` 已钉 `140.82.113.3/113.6`；②当日中午起 TLS 握手被按概率切断（~1/4 成功率，所有 GitHub IP 同症）；③机场 11/11 节点全灭（含 IPv6 节点，`jp01.baomayun.com` NXDOMAIN）——iptables 透明代理规则已撤回。**等机场恢复/换机场后重试**；或用户每次 ~1/4 概率反复重试碰运气
 2. **登录后无邮箱源**：GitHub 只是身份。需在「设置 → 连接」连 Microsoft（需 Azure 注册）或 Google 邮箱
-3. **Microsoft 按钮是 dummy 凭据**（点了必败）：要么 Azure 注册真凭据，要么 server 代码把 microsoft `required:true` 改 false 并删 dummy env（注意 required 缺 env 会让 server 启动 throw，两步必须一起）
+3. **Microsoft 按钮是 dummy 凭据**（点了必败）：用户已拍板**暂不动**（2026-09-06）。备选：Azure 注册真凭据，或 server 代码把 microsoft `required:true` 改 false 并删 dummy env（注意 required 缺 env 会让 server 启动 throw，两步必须一起）
 4. **新镜像未部署**：CI 已出含 CA+ioredis+auth 的 server 镜像；按「容器即主机」模型不急，recreate 时记得 ~28 分钟 wrangler 冷启动 + 按 deploy-hotfix.md 自装软件清单核对
-5. 小瑕疵：GitHub 授权 URL 里 scope 重复（`read:user user:email` ×2，Better Auth 默认+显式叠加，无害）——可把 auth-providers.ts github 条目的 `scope` 字段删掉
+5. ~~小瑕疵：scope 重复~~ **已修**（2026-09-06，`2b571bc`）：github 条目显式 scope 已删，授权 URL `scope=read:user+user:email` 只出现一次，已热更到容器并实测
 
 ## NAS 关键事实
 
@@ -32,5 +32,5 @@
 
 ## juzi 状态
 
-- 本仓库 `.juzi/` 尚未提交过（untracked）；本轮 add-feature 流水线已收官
+- 本仓库 `.juzi/` 不纳入 git（用户已拍板 2026-09-06，保持 untracked）；本轮 add-feature 流水线已收官
 - 全局语言兜底已写 `~/.config/opencode/AGENTS.md`（默认中文）
