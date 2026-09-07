@@ -125,11 +125,10 @@ export const createAuth = () => {
       },
     },
     emailAndPassword: {
-      enabled: false,
-      requireEmailVerification: true,
+      enabled: true,
       sendResetPassword: async ({ user, url }) => {
         await resend().emails.send({
-          from: '0.email <onboarding@0.email>',
+          from: `onemails <${env.RESEND_FROM_EMAIL}>`,
           to: user.email,
           subject: 'Reset your password',
           html: `
@@ -148,7 +147,7 @@ export const createAuth = () => {
         const verificationUrl = `${c.env.VITE_PUBLIC_APP_URL}/api/auth/verify-email?token=${token}&callbackURL=/settings/connections`;
 
         await resend().emails.send({
-          from: '0.email <onboarding@0.email>',
+          from: `onemails <${env.RESEND_FROM_EMAIL}>`,
           to: user.email,
           subject: 'Verify your 0.email account',
           html: `

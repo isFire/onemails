@@ -1,11 +1,13 @@
-import { useEffect, type ReactNode, useState, Suspense } from 'react';
+import { useEffect, type ReactNode, useState, Suspense, type FormEvent } from 'react';
 import type { EnvVarInfo } from '@zero/server/auth-providers';
 import ErrorMessage from '@/app/(auth)/login/error-message';
-import { signIn, useSession } from '@/lib/auth-client';
+import { signIn, signUp, useSession } from '@/lib/auth-client';
 import { GitHub, Google, Microsoft } from '@/components/icons/icons';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { TriangleAlert } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 interface EnvVarStatus {
@@ -71,6 +73,12 @@ const getProviderIcon = (providerId: string, className?: string): ReactNode => {
 function LoginClientContent({ providers, isProd }: LoginClientProps) {
   const navigate = useNavigate();
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const missing = providers.find((p) => p.required && !p.enabled);
@@ -120,6 +128,47 @@ function LoginClientContent({ providers, isProd }: LoginClientProps) {
           error: 'Login redirect failed',
         },
       );
+    }
+  };
+
+  const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (mode === 'login') {
+        const { error } = await signIn.email({
+          email,
+          password,
+          callbackURL: `${window.location.origin}/mail`,
+        });
+        if (error) {
+          toast.error(error.message || 'Login failed');
+          return;
+        }
+      } else {
+        const { error } = await signUp.email({
+          name,
+          email,
+          password,
+          callbackURL: `${window.location.origin}/mail`,
+        });
+        if (error) {
+          toast.error(error.message || 'Sign up failed');
+          return;
+        }
+      }
+      navigate('/mail');
+    } catch {
+      toast.error(mode === 'login' ? 'Login failed' : 'Sign up failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -276,6 +325,117 @@ function LoginClientContent({ providers, isProd }: LoginClientProps) {
           )}
 
           <ErrorMessage />
+
+          <div className="w-full space-y-4">
+            <div className="flex rounded-lg border border-black/10 bg-black/5 p-1 dark:border-white/10 dark:bg-white/5">
+              {(['login', 'signup'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setMode(tab)}
+                  className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+                    mode === tab
+                      ? 'bg-white text-black dark:bg-white dark:text-black'
+                      : 'text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white'
+                  }`}
+                >
+                  {tab === 'login' ? 'Login' : 'Sign Up'}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleEmailSubmit} className="space-y-3">
+              {mode === 'signup' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-black/80 dark:text-white/80">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-black/80 dark:text-white/80">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-black/80 dark:text-white/80">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                {mode === 'login' && (
+                  <div className="text-right">
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs text-black/60 underline-offset-2 hover:text-black hover:underline dark:text-white/60 dark:hover:text-white"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {mode === 'signup' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-password" className="text-black/80 dark:text-white/80">
+                    Confirm Password
+                  </Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <Button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-lg">
+                {isSubmitting
+                  ? 'Please wait...'
+                  : mode === 'login'
+                    ? 'Login with Email'
+                    : 'Create Account'}
+              </Button>
+            </form>
+          </div>
+
+          {!hasMissingRequiredProviders && (
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+              <span className="text-xs text-black/40 dark:text-white/40">or continue with</span>
+              <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+            </div>
+          )}
 
           {!hasMissingRequiredProviders && (
             <div className="relative z-10 mx-auto flex w-full flex-col items-center justify-center gap-2">
