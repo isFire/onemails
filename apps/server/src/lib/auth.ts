@@ -236,6 +236,8 @@ const createAuthConfig = () => {
       'http://localhost:3000',
       'https://3000-firebase-zero-1748315478636.cluster-3gc7bglotjgwuxlqpiut7yyqt4.cloudworkstations.dev',
       'http://localhost:4173',
+      // 部署环境域名兜底：env.VITE_PUBLIC_APP_URL 未配成该值时仍放行
+      'https://onemails-app.qingtangbaimian.cn',
       env.VITE_PUBLIC_APP_URL,
     ].filter(Boolean),
     session: {
