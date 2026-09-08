@@ -46,6 +46,10 @@ class IORedisCompat implements RedisLike {
   hset(key: string, obj: Record<string, string | number>) {
     return this.client.hset(key, obj);
   }
+  // analytics 写入路径(@upstash/core-analytics ingest)用 zincrby 计数,签名与 ioredis 一致。
+  zincrby(key: string, increment: number, member: string) {
+    return this.client.zincrby(key, increment, member);
+  }
 }
 
 // wrangler dev 单进程,模块级单例复用 TCP 连接,避免每请求建连。
