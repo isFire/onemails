@@ -1,5 +1,6 @@
 import { connectionToDriver, getActiveConnection } from '../lib/server-utils';
 import { Ratelimit, type RatelimitConfig } from '@upstash/ratelimit';
+import type { Redis as UpstashRedisClient } from '@upstash/redis';
 import type { HonoContext, HonoVariables } from '../ctx';
 import { getConnInfo } from 'hono/cloudflare-workers';
 import { initTRPC, TRPCError } from '@trpc/server';
@@ -84,7 +85,8 @@ export const createRateLimiterMiddleware = (config: {
 }) =>
   t.middleware(async ({ next, ctx, input }) => {
     const ratelimiter = new Ratelimit({
-      redis: redis(),
+      // IORedisCompat 已按 upstash 签名适配 evalsha/scriptLoad/hset 等,运行时可满足,此处仅过类型关
+      redis: redis() as unknown as UpstashRedisClient,
       limiter: config.limiter,
       analytics: true,
       prefix: config.generatePrefix(ctx, input),

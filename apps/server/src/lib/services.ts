@@ -8,7 +8,8 @@ export const resend = () =>
     ? new Resend(env.RESEND_API_KEY)
     : { emails: { send: async (...args: unknown[]) => console.log(args) } };
 
-// redis() 的统一接口面:全 server 只用 get / set({ex}) / del(auth.ts 的 secondaryStorage)。
+// redis() 的统一接口面:auth.ts 的 secondaryStorage 只用 get / set({ex}) / del;
+// trpc 限流中间件(@upstash/ratelimit)另需 evalsha/scriptLoad/eval/hset(见 IORedisCompat 内注释)。
 export interface RedisLike {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, opts?: { ex?: number }): Promise<unknown>;
@@ -28,6 +29,22 @@ class IORedisCompat implements RedisLike {
   }
   del(key: string) {
     return this.client.del(key);
+  }
+
+  // @upstash/ratelimit(trpc 限流中间件)依赖的方法——upstash 签名是 keys/args 数组,
+  // ioredis 是 numKeys+展开参数,这里做适配;缺了它们所有限流路由直接 500(evalsha is not a function)。
+  evalsha(sha: string, keys: string[], args: (string | number)[]) {
+    return this.client.evalsha(sha, keys.length, ...keys, ...args.map(String));
+  }
+  eval(script: string, keys: string[], args: (string | number)[]) {
+    return this.client.eval(script, keys.length, ...keys, ...args.map(String));
+  }
+  scriptLoad(script: string) {
+    return this.client.script('LOAD', script);
+  }
+  // ratelimit analytics 走 upstash 风格 hset(key, obj);ioredis 原生接受对象形式,直接透传。
+  hset(key: string, obj: Record<string, string | number>) {
+    return this.client.hset(key, obj);
   }
 }
 
