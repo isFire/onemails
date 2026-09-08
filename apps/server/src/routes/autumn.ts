@@ -1,6 +1,32 @@
 import { fetchPricingTable } from 'autumn-js';
+import { env } from 'cloudflare:workers';
 import type { HonoContext } from '../ctx';
 import { Hono } from 'hono';
+
+// 自托管单机部署没有真实计费需求:DISABLE_BILLING=true 时桩化 autumn 应答,
+// 让前端 useBilling 读到 unlimited + pro,不再依赖 useautumn.com 后台配产品。
+const isBillingDisabled = () => env.DISABLE_BILLING === 'true';
+
+const stubFeatures = {
+  unlimited: true,
+  balance: null,
+  usage: 0,
+  included_usage: 0,
+  interval: null,
+  next_reset_at: null,
+};
+
+const stubCustomer = (customerData: { customerId: string; customerData: { name: string; email: string } }) => ({
+  id: customerData.customerId,
+  name: customerData.customerData.name,
+  email: customerData.customerData.email,
+  products: [{ id: 'pro-example', name: 'pro-example', status: 'active' }],
+  features: {
+    connections: stubFeatures,
+    'chat-messages': stubFeatures,
+    'brain-activity': stubFeatures,
+  },
+});
 
 const sanitizeCustomerBody = (body: any) => {
   let bodyCopy = { ...body };
@@ -43,6 +69,7 @@ export const autumnApi = new Hono<AutumnContext>()
     const { autumn, customerData } = c.var;
     const body = await c.req.json();
     if (!customerData) return c.json({ error: 'No customer ID found' }, 401);
+    if (isBillingDisabled()) return c.json(stubCustomer(customerData));
 
     return c.json(
       await autumn.customers
@@ -93,6 +120,7 @@ export const autumnApi = new Hono<AutumnContext>()
     const body = await c.req.json();
     const sanitizedBody = sanitizeCustomerBody(body);
     if (!customerData) return c.json({ error: 'No customer ID found' }, 401);
+    if (isBillingDisabled()) return c.json({ allowed: true, unlimited: true });
 
     return c.json(
       await autumn

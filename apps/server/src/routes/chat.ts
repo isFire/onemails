@@ -4,6 +4,7 @@ import { streamText, generateObject, tool, generateText } from 'ai';
 import { publicTools, tools } from './agent/tools';
 import { getContext } from 'hono/context-storage';
 import { connection } from '@zero/db/schema';
+import { env } from 'cloudflare:workers';
 import type { HonoContext } from '../ctx';
 import { openai } from '@ai-sdk/openai';
 import { eq } from 'drizzle-orm';
@@ -34,25 +35,30 @@ export const chatHandler = async () => {
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
   console.log('Checking chat permissions for user:', session.user.id);
-  const canSendMessages = await autumn.check({
-    feature_id: 'chat-messages',
-    customer_id: session.user.id,
-  });
-  console.log('Autumn check result:', JSON.stringify(canSendMessages, null, 2));
+  // 自托管 DISABLE_BILLING=true 时跳过 autumn 配额检查(与 routes/autumn.ts 桩化呼应)
+  if (env.DISABLE_BILLING === 'true') {
+    console.log('Billing disabled, skipping autumn check');
+  } else {
+    const canSendMessages = await autumn.check({
+      feature_id: 'chat-messages',
+      customer_id: session.user.id,
+    });
+    console.log('Autumn check result:', JSON.stringify(canSendMessages, null, 2));
 
-  if (!canSendMessages.data) {
-    console.log('No data returned from Autumn check');
-    return c.json({ error: 'Insufficient permissions' }, 403);
-  }
+    if (!canSendMessages.data) {
+      console.log('No data returned from Autumn check');
+      return c.json({ error: 'Insufficient permissions' }, 403);
+    }
 
-  if (canSendMessages.data.unlimited) {
-    console.log('User has unlimited access');
-  } else if (!canSendMessages.data.balance) {
-    console.log('No balance and not unlimited');
-    return c.json({ error: 'Insufficient plan quota' }, 403);
-  } else if (canSendMessages.data.balance <= 0) {
-    console.log('Balance is 0 or less');
-    return c.json({ error: 'Insufficient plan balance' }, 403);
+    if (canSendMessages.data.unlimited) {
+      console.log('User has unlimited access');
+    } else if (!canSendMessages.data.balance) {
+      console.log('No balance and not unlimited');
+      return c.json({ error: 'Insufficient plan quota' }, 403);
+    } else if (canSendMessages.data.balance <= 0) {
+      console.log('Balance is 0 or less');
+      return c.json({ error: 'Insufficient plan balance' }, 403);
+    }
   }
 
   const _conn = await getActiveConnection().catch((err) => {
